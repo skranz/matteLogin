@@ -1,0 +1,38 @@
+# Tables for simple user management
+
+users:
+  descr: user table
+  table:
+    userid: VARCHAR(255)
+    email: VARCHAR(255)
+    salt: VARCHAR(2048)
+    hash: VARCHAR(2048)
+    confirmed: BOOLEAN
+    createTime: DATETIME
+  indexes:
+    - "CREATE UNIQUE INDEX users1 on users (userid)"
+    - "CREATE INDEX users2 on users (confirmed)"
+
+links:
+  descr: temporary links to a shiny app
+  table:
+    linkid: VARCHAR(128)
+    userid: VARCHAR(255)
+    linkType: CHAR(20)
+    url: TEXT
+    validUntil: DATETIME
+    createTime: DATETIME
+  indexes:
+    - "CREATE UNIQUE INDEX links1 on links (linkid);"
+    - "CREATE UNIQUE INDEX links2 on links (userid,created,linkid);"
+    - "CREATE UNIQUE INDEX links3 on links (validUntil,userid,linkid);"
+
+smtp:
+  table:
+    smtpid: VARCHAR(255)
+    yaml: TEXT
+  indexes:
+    - "CREATE UNIQUE INDEX smtpid on smtp (yaml)"
+
+
+

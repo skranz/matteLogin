@@ -8,4 +8,4 @@ Maintainer: Sebastian Kranz <sebastian.kranz@uni-ulm.de>
 Description: A simple login framework for shiny (probably not very secure)
 License: GPL >= 2.0
 LazyData: TRUE
-Depends: openssl, shiny, shinyEvents, shinyBS, mailR, yaml
+Depends: openssl, shiny, shinyEvents, shinyBS, mailR, yaml, RSQLite

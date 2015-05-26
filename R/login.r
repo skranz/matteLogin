@@ -1,24 +1,22 @@
 examples.matte.login = function() {
 
-  make.password.hash(user="jondoe",password= "password")
-  res = make.password.hash(user="jondoe",password= "password")
-  pw.df = as.data.frame(res)
+  setwd("D:/libraries/matteLogin")
   app = eventsApp()
 
-  login.fun = function(app=getApp(),user,matte,...) {
-    cat("Successfully logged in as ", user)
+  login.fun = function(app=getApp(),userid,matte=get.matte(),...) {
+    cat("Successfully logged in as ", userid)
     setUI("mainUI", success.ui)
   }
 
-  signup.fun = function(app=getApp(), matte,...) {
+  signup.fun = function(app=getApp(), matte=get.matte(),...) {
     cat("\nSign up...\n")
     ui = matte.create.email.user.ui(matte)
     setUI("mainUI", ui)
   }
 
   check.email.fun = function(email="",...) {
-    if (!isTRUE(email=="???" |
-                email=="???")) {
+    if (!isTRUE(email=="sebastian.kranz@uni-ulm.de" |
+                email=="sebkranz@gmail.com")) {
       return(list(ok=FALSE, msg="Please only send to your own email adresses!"))
     }
   list(ok=TRUE,msg="")
@@ -26,77 +24,44 @@ examples.matte.login = function() {
 
   sender.file = "D:/libraries/matteLogin/sender.txt"
   login = matte.login()
-  matte = make.matte(login=login, sender.file=sender.file, login.fun=login.fun, signup.fun=signup.fun, check.email.fun=check.email.fun,app.url="http://127.0.0.1:4915")
-  matte$login$ui = matte.login.ui(matte)
+  db.arg = matte.db.arg(dbname="testdb",drv=SQLite())
 
-  matte.set.pw.df(matte,pw.df)
+  matte = make.matte(db.arg = db.arg,login=login, login.fun=login.fun, signup.fun=signup.fun, check.email.fun=check.email.fun,app.url="http://127.0.0.1:4915")
+  set.matte( matte)
+  matte.connect.db(matte=matte)
+  matte$login$ui = matte.login.ui(matte)
+  matte$smtp = matte.get.smtp()
+
 
   success.ui = wellPanel(
     actionButton("successBtn", "Success... log in again")
   )
   buttonHandler("successBtn", function(app,...) {
+    show.html.message(matte$login$alert,"")
     setUI("mainUI",matte$login$ui)
   })
 
 
   ui = fluidPage(uiOutput("mainUI"))
   setUI("mainUI",matte$login$ui)
-  #setUI("mainUI",success.ui)
   runEventsApp(app,ui = ui, launch.browser=rstudio::viewer)
-}
 
-matte.set.pw.df = function(matte,pw.df=NULL,app=getApp()) {
-  app[[matte$pw.df.field]]=pw.df
-}
-
-matte.get.pw.df = function(matte,app=getApp()) {
-  app[[matte$pw.df.field]]
 }
 
 
-make.matte = function(pw.file=NULL, sender.file=NULL, login.fun=NULL, signup.fun = NULL, check.email.fun=NULL, app.url = NULL, app.title="matteLogin",
-    login = matte.login(...),
-    crem = matte.crem(...),
-    crepa = matte.crepa(...), ...)
-{
-  restore.point("make.matte")
-  matte = list(
-    app.title = app.title,
-    app.url = app.url,
-    pw.file = pw.file,
-    sender.file = sender.file,
-    pw.df.field = "pw.df",
-    user.name.field = "user.name",
-    user.email.field = "user.email",
-    login.fun = login.fun,
-    signup.fun = signup.fun,
-    check.email.fun = check.email.fun,
-    login = login,
-    crem = crem,
-    crepa = crepa
-  )
-  if (!is.null(matte$sender.file)) {
-    sender.txt = readLines(matte$sender.file)
-    txt = poor.decrypt(sender.txt)
-    matte$sender = yaml.load(txt)
-  }
-
-  as.environment(matte)
-}
-
-matte.login = function(failure.fun=matte.failed.login, create.user.fun=NULL, ui=NULL,...) {
+matte.login = function(failed.fun=matte.failed.login, create.user.fun=NULL, ui=NULL,...) {
   login = list(
-    user.label="User",
+    userid.label="User",
     password.label="Password",
-    login.button.label="log in",
-    signup.button.label="sign up",
+    login.btn.label="log in",
+    signup.btn.label="sign up",
 
-    user.id="matte.login.user",
-    password.id="matte.login.password",
-    login.button.id = "matte.login.btn",
-    signup.button.id = "matte.login.signup.btn",
-    alert.id="matte.login.alert",
-    failure.fun=failure.fun
+    userid.inp="matte.login.user",
+    password.inp="matte.login.password",
+    login.btn = "matte.login.btn",
+    signup.btn = "matte.login.signup.btn",
+    alert="matte.login.alert",
+    failed.fun=failed.fun
   )
   login
 }
@@ -105,42 +70,58 @@ matte.login.ui = function(matte, create.user = TRUE,...) {
   copy.into.env(source = matte$login)
 
   widgets = list(
-    textInput(user.id, user.label, value = ""),
-    passwordInput(password.id, password.label, value = ""),
-    actionButton(login.button.id, login.button.label),
-    actionButton(signup.button.id, signup.button.label),
-    bsAlert(alert.id)
+    textInput(userid.inp, userid.label, value = ""),
+    passwordInput(password.inp, password.label, value = ""),
+    actionButton(login.btn, login.btn.label),
+    actionButton(signup.btn, signup.btn.label),
+    uiOutput(alert)
   )
   ui = wellPanel(widgets)
 
-  buttonHandler(login.button.id,matte.login.button.click, matte=matte)
-  buttonHandler(signup.button.id,matte.signup.button.click, matte=matte)
+  buttonHandler(login.btn,matte.login.btn.click, matte=matte)
+  buttonHandler(signup.btn,matte.signup.btn.click, matte=matte)
   ui
 }
 
-
-matte.signup.button.click = function(app=getApp(),matte,...) {
+matte.signup.btn.click = function(app=getApp(),matte,...) {
   if (!is.null(matte$signup.fun)) {
     matte$signup.fun(matte=matte,...)
   }
 }
 
-
-matte.login.button.click = function(app=getApp(),matte,...) {
+matte.login.btn.click = function(app=getApp(),matte=get.matte(),...) {
   login = matte$login
-  user = getInputValue(login$user.id)
-  password = getInputValue(login$password.id)
+  userid = getInputValue(login$userid.inp)
+  password = getInputValue(login$password.inp)
 
-  res = check.password(user = user,password = password,pw.df = login$pw.df)
-  if (res==TRUE) {
-    matte$login.fun(user=user, password=password, matte=matte)
+
+  res = matte.check.login(userid=userid,password = password, matte=matte)
+  restore.point("matte.login.btn.click")
+  if (res$ok==TRUE) {
+    matte$login.fun(userid=userid, password=password, matte=matte)
   } else {
-    login$failure.fun(user=user, password=password, matte=matte)
+    login$failed.fun(userid=userid, password=password, msg=res$msg, matte=matte)
   }
 }
 
-matte.failed.login = function(app=getApp(),matte,...) {
+matte.failed.login = function(app=getApp(),matte=get.matte(),msg,...) {
   login = matte$login
-  createAlert(app$session, login$alert.id,title="Log-in failed",content="Wrong user or wrong password.", style="warning")
-  cat("\nlog-in failed")
+  show.html.warning(login$alert,msg)
+  #createAlert(app$session, login$alert,title="Log-in failed",content=msg, style="warning")
+  cat("\nlog-in failed: ",msg)
+}
+
+matte.check.login = function(userid, password, matte=get.matte()) {
+  restore.point("matte.check.login")
+  if (nchar(userid)==0)
+    return(list(ok=FALSE,msg="No user name entered."))
+  user = matte.get.user(userid=userid, matte=matte)
+  if (NROW(user)==0) {
+    return(list(ok=FALSE,msg="User does not exist."))
+  }
+  ok = check.password(password = password, salt=user$salt,hash=user$hash)
+  if (ok) {
+    return(list(ok=TRUE,msg=""))
+  }
+  return(list(ok=FALSE,msg="Wrong password."))
 }
